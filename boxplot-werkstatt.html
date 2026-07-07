@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Boxplot-Werkstatt</title>
+<style>
+  :root{
+    --bg:#f3f5f9;
+    --panel:#ffffff;
+    --ink:#1e2430;
+    --ink-soft:#5b6474;
+    --line:#e3e7ef;
+    --accent:#2563eb;
+    --danger:#dc2626;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  body{padding:18px 16px 60px;}
+  .wrap{max-width:1100px;margin:0 auto;}
+  h1{font-size:1.4rem;margin:0 0 4px;}
+  .subtitle{color:var(--ink-soft);font-size:.92rem;margin:0 0 16px;line-height:1.4;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:0 1px 2px rgba(20,25,40,.04);}
+
+  /* global controls */
+  .globalbar{padding:14px 16px;margin-bottom:18px;display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;}
+  .field{display:flex;align-items:center;gap:6px;font-size:.88rem;color:var(--ink-soft);}
+  .field label{white-space:nowrap;}
+  .field input[type=number]{width:70px;padding:6px 7px;border:1px solid var(--line);border-radius:8px;font-size:.88rem;}
+  .field input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);}
+  .spacer{flex:1 1 auto;min-width:8px;}
+  .btn{border:none;border-radius:9px;padding:9px 14px;font-size:.88rem;font-weight:600;
+    cursor:pointer;transition:filter .15s;touch-action:manipulation;}
+  .btn:active{filter:brightness(.92);}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-ghost{background:#eef1f6;color:var(--ink);}
+  .btn-danger{background:#fdecec;color:var(--danger);}
+
+  /* dataset panels */
+  #datasetsContainer{display:flex;flex-direction:column;gap:16px;}
+  .dsPanel{padding:14px 16px 10px;}
+  .dsHead{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px;}
+  .colorDot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;}
+  .dsLabel{border:1px solid transparent;background:transparent;font-size:1.02rem;font-weight:700;
+    padding:4px 6px;border-radius:7px;min-width:80px;max-width:220px;}
+  .dsLabel:focus{border-color:var(--line);background:#fafbfd;outline:none;}
+  .colorPicker{width:30px;height:30px;border:1px solid var(--line);border-radius:8px;padding:2px;background:#fff;cursor:pointer;}
+  .meanToggle{display:flex;align-items:center;gap:5px;font-size:.85rem;color:var(--ink-soft);}
+  .meanToggle input{width:16px;height:16px;accent-color:var(--accent);}
+  .dsActions{display:flex;gap:8px;margin-left:auto;}
+  .iconBtn{border:none;background:#eef1f6;color:var(--ink-soft);border-radius:8px;
+    width:32px;height:32px;font-size:.95rem;cursor:pointer;}
+  .iconBtn.warn{background:#fdecec;color:var(--danger);}
+
+  .valuesRow{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+  .valuesRow label{font-size:.8rem;color:var(--ink-soft);white-space:nowrap;}
+  .valuesInput{flex:1 1 260px;min-width:180px;padding:8px 10px;border:1px solid var(--line);
+    border-radius:9px;font-size:.92rem;font-family:inherit;}
+  .valuesInput:focus{outline:2px solid #cdd9f7;border-color:var(--accent);}
+
+  .statsLine{font-size:.8rem;color:var(--ink-soft);margin-bottom:6px;min-height:1.1em;}
+  .statsLine b{color:var(--ink);}
+
+  .plotSvg{width:100%;display:block;touch-action:none;user-select:none;}
+  .hint{font-size:.74rem;color:#98a1b2;margin-top:2px;}
+
+  .emptyState{padding:26px;text-align:center;color:var(--ink-soft);font-size:.92rem;}
+
+  footer{text-align:center;color:#a3aab8;font-size:.74rem;margin-top:22px;}
+
+  @media (max-width:520px){
+    .dsLabel{max-width:140px;}
+  }
+
+  /* CSV import modal */
+  .modalOverlay{position:fixed;inset:0;background:rgba(20,25,40,.45);display:none;
+    align-items:center;justify-content:center;padding:20px;z-index:50;}
+  .modalOverlay.open{display:flex;}
+  .modalCard{background:#fff;border-radius:16px;max-width:540px;width:100%;
+    max-height:85vh;overflow:auto;padding:20px 22px;}
+  .modalCard h2{margin:0 0 8px;font-size:1.12rem;}
+  .modalHint{font-size:.82rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.5;}
+  .csvModeRow{display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:14px;font-size:.86rem;}
+  .csvModeRow label{display:flex;align-items:center;gap:5px;}
+  .csvPreviewList{border:1px solid var(--line);border-radius:10px;padding:4px 10px;
+    max-height:260px;overflow:auto;margin-bottom:16px;}
+  .csvRow{display:flex;align-items:flex-start;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);
+    font-size:.85rem;cursor:pointer;}
+  .csvRow:last-child{border-bottom:none;}
+  .csvRow input{margin-top:3px;width:16px;height:16px;accent-color:var(--accent);flex:0 0 auto;}
+  .csvRowText b{display:block;}
+  .csvMeta{color:var(--ink-soft);font-weight:400;}
+  .csvVals{color:var(--ink-soft);font-size:.78rem;margin-top:2px;}
+  .modalActions{display:flex;justify-content:flex-end;gap:10px;}
+  .fileDrop{border:2px dashed var(--line);border-radius:10px;padding:8px 10px;font-size:.78rem;
+    color:var(--ink-soft);text-align:center;margin-bottom:14px;}
+
+  /* print layout */
+  @media print{
+    body{background:#fff;padding:0;}
+    .no-print{display:none !important;}
+    .card{box-shadow:none;border:1px solid #ccc;}
+    .wrap{max-width:100%;}
+    .dsPanel{page-break-inside:avoid;break-inside:avoid;border:1px solid #ccc;}
+    [data-role="delete-badge"]{display:none;}
+    .valuesInput{border-color:#ccc;background:#fff;color:#333;}
+    .dsLabel{border-color:transparent;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📦 Boxplot-Werkstatt</h1>
+  <p class="subtitle no-print">
+    Werte pro Datensatz durch <b>Semikolon</b> getrennt eingeben (z.&nbsp;B. <code>3,5; 7; 2,1; 9</code>)
+    – oder direkt in den Punktebereich tippen, um einen Punkt zu setzen, und Punkte mit dem Finger/der Maus verschieben.
+    Der Boxplot aktualisiert sich live. Ein angetippter Punkt zeigt ein ✕ zum Löschen.
+  </p>
+
+  <div class="card globalbar no-print">
+    <div class="field">
+      <input type="checkbox" id="autoAxisChk" checked>
+      <label for="autoAxisChk">Achse automatisch</label>
+    </div>
+    <div class="field">
+      <label for="axisMinInput">Min</label>
+      <input type="number" id="axisMinInput" step="any" disabled>
+    </div>
+    <div class="field">
+      <label for="axisMaxInput">Max</label>
+      <input type="number" id="axisMaxInput" step="any" disabled>
+    </div>
+    <div class="field">
+      <input type="checkbox" id="snapChk" checked>
+      <label for="snapChk">Punkte einrasten, Schritt</label>
+      <input type="number" id="snapStepInput" step="any" min="0.01" value="0.5">
+    </div>
+    <div class="spacer"></div>
+    <button class="btn btn-ghost" id="exampleBtn">Beispieldaten</button>
+    <button class="btn btn-ghost" id="resetBtn">Zurücksetzen</button>
+    <button class="btn btn-ghost" id="csvImportBtn">⇪ CSV importieren</button>
+    <button class="btn btn-ghost" id="printBtn">🖨 Drucken</button>
+    <button class="btn btn-primary" id="addDatasetBtn">+ Datensatz</button>
+  </div>
+
+  <input type="file" id="csvFileInput" accept=".csv,text/csv,text/plain" style="display:none">
+
+  <div id="datasetsContainer"></div>
+  <div id="emptyState" class="card emptyState" style="display:none;">
+    Keine Datensätze vorhanden. Mit „+ Datensatz“ einen neuen anlegen.
+  </div>
+
+  <footer class="no-print">Boxplot-Werkstatt · einzelne HTML-Datei, keine Internetverbindung nötig</footer>
+</div>
+
+<div class="modalOverlay no-print" id="csvModal">
+  <div class="modalCard">
+    <h2>CSV-Datensätze importieren</h2>
+    <p class="modalHint">
+      Zwei Formate werden erkannt (Trennzeichen <code>,</code> <code>;</code> oder Tab automatisch, Dezimalkomma möglich):<br>
+      • <b>Eine Zeile pro Datensatz:</b> <code>Klasse 10a;12;15;18;21</code><br>
+      • <b>Tabelle mit Kopfzeile:</b> je Spalte ein Datensatz – Name in Zeile 1, Werte darunter.
+    </p>
+    <div class="csvModeRow">
+      <label><input type="radio" name="csvMode" value="append" checked> Zu vorhandenen Datensätzen hinzufügen</label>
+      <label><input type="radio" name="csvMode" value="replace"> Vorhandene Datensätze ersetzen</label>
+    </div>
+    <div class="csvPreviewList" id="csvPreviewList"></div>
+    <div class="modalActions">
+      <button class="btn btn-ghost" id="csvCancelBtn">Abbrechen</button>
+      <button class="btn btn-primary" id="csvConfirmBtn">Importieren</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- constants ----------
+  var VIEW_W = 1000, PAD_L = 52, PAD_R = 34;
+  var BOX_AREA_H = 66, ROW_H = 22, RADIUS = 8, AXIS_H = 34;
+  var PALETTE = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d'];
+
+  // ---------- state ----------
+  var state = {
+    autoAxis: true,
+    axisMin: 0, axisMax: 10, axisStep: 2,
+    snap: true, snapStep: 0.5,
+    nextId: 1,
+    datasets: []
+  };
+  var currentAxis = {min:0, max:10, step:2, ticks:[0,2,4,6,8,10]};
+  var selectedPoint = null; // {dsId, idx}
+  var pendingDeleteDsId = null; // two-tap confirm for dataset removal
+  var pendingResetConfirm = false;
+
+  var elDatasets = document.getElementById('datasetsContainer');
+  var elEmpty = document.getElementById('emptyState');
+  var elAutoAxis = document.getElementById('autoAxisChk');
+  var elAxisMin = document.getElementById('axisMinInput');
+  var elAxisMax = document.getElementById('axisMaxInput');
+  var elSnap = document.getElementById('snapChk');
+  var elSnapStep = document.getElementById('snapStepInput');
+
+  // ---------- helpers ----------
+  function round2(n){ return Math.round(n*100)/100; }
+  function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
+  function fmt(n){
+    if(!isFinite(n)) return '–';
+    var r = Math.round(n*100)/100;
+    var s = (Object.is(r,-0)?0:r).toString();
+    return s.replace('.', ',');
+  }
+  function makeId(){ return 'ds' + (state.nextId++); }
+
+  function parseInputToValues(text){
+    return text.split(';')
+      .map(function(t){ return t.trim().replace(',', '.'); })
+      .filter(function(t){ return t.length>0; })
+      .map(parseFloat)
+      .filter(function(n){ return isFinite(n); });
+  }
+  function valuesToInputText(values){
+    return values.map(fmt).join('; ');
+  }
+
+  function med(arr){
+    var n = arr.length, mid = Math.floor(n/2);
+    return n % 2 ? arr[mid] : (arr[mid-1] + arr[mid]) / 2;
+  }
+  function computeStats(values){
+    if(values.length === 0) return null;
+    var v = values.slice().sort(function(a,b){ return a-b; });
+    var n = v.length;
+    var median = med(v);
+    var lower = v.slice(0, Math.floor(n/2));
+    var upper = v.slice(Math.ceil(n/2));
+    var q1 = lower.length ? med(lower) : v[0];
+    var q3 = upper.length ? med(upper) : v[n-1];
+    var mean = v.reduce(function(a,b){ return a+b; }, 0) / n;
+    return {n:n, min:v[0], max:v[n-1], median:median, q1:q1, q3:q3, mean:mean};
+  }
+
+  function computeNiceAxis(min, max){
+    if(min === max){ min -= 1; max += 1; }
+    var pad = (max - min) * 0.15 || 1;
+    var lo = min - pad, hi = max + pad;
+    var range = hi - lo;
+    var rawStep = range / 6;
+    var mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    var norm = rawStep / mag;
+    var step;
+    if(norm < 1.5) step = 1*mag;
+    else if(norm < 3) step = 2*mag;
+    else if(norm < 7) step = 5*mag;
+    else step = 10*mag;
+    var niceMin = Math.floor(lo/step)*step;
+    var niceMax = Math.ceil(hi/step)*step;
+    return {min: round2(niceMin), max: round2(niceMax), step: step};
+  }
+
+  function buildTicks(axis){
+    var ticks = [];
+    var eps = axis.step/1000;
+    for(var t = axis.min; t <= axis.max + eps; t += axis.step){
+      ticks.push(round2(t));
+    }
+    return ticks;
+  }
+
+  function recomputeAxis(){
+    if(state.autoAxis){
+      var all = [];
+      state.datasets.forEach(function(d){ all = all.concat(d.values); });
+      var a;
+      if(all.length === 0){ a = {min:0, max:10, step:2}; }
+      else { a = computeNiceAxis(Math.min.apply(null, all), Math.max.apply(null, all)); }
+      state.axisMin = a.min; state.axisMax = a.max; state.axisStep = a.step;
+    } else {
+      if(state.axisMax <= state.axisMin) state.axisMax = state.axisMin + 1;
+      var span = state.axisMax - state.axisMin;
+      var s = Math.pow(10, Math.floor(Math.log10(span/6 || 1)));
+      state.axisStep = s;
+    }
+    currentAxis = {min: state.axisMin, max: state.axisMax, step: state.axisStep};
+    currentAxis.ticks = buildTicks(currentAxis);
+  }
+
+  function xScale(v){
+    var plotW = VIEW_W - PAD_L - PAD_R;
+    return PAD_L + (v - currentAxis.min) / (currentAxis.max - currentAxis.min) * plotW;
+  }
+  function pxToValue(px){
+    var plotW = VIEW_W - PAD_L - PAD_R;
+    return currentAxis.min + (px - PAD_L) / plotW * (currentAxis.max - currentAxis.min);
+  }
+  function getRelX(e, svg){
+    var rect = svg.getBoundingClientRect();
+    var scale = VIEW_W / rect.width;
+    return (e.clientX - rect.left) * scale;
+  }
+
+  function computeStacks(values){
+    var order = values.map(function(v,i){ return i; })
+      .sort(function(a,b){ return values[a]-values[b]; });
+    var threshold = RADIUS*2 + 2;
+    var cols = [];
+    order.forEach(function(i){
+      var x = xScale(values[i]);
+      var col = cols[cols.length-1];
+      if(col && Math.abs(x - col.x) <= threshold){
+        col.idxs.push(i);
+      } else {
+        cols.push({x:x, idxs:[i]});
+      }
+    });
+    var rowOf = {}, maxRows = 1;
+    cols.forEach(function(col){
+      col.idxs.forEach(function(i, r){ rowOf[i] = r; });
+      maxRows = Math.max(maxRows, col.idxs.length);
+    });
+    return {rowOf: rowOf, maxRows: maxRows};
+  }
+
+  function escXml(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ---------- CSV import ----------
+  function csvToNum(s){
+    if(s === undefined || s === null) return null;
+    s = String(s).trim();
+    if(s === '') return null;
+    var n = parseFloat(s.replace(',', '.'));
+    return isFinite(n) ? n : null;
+  }
+
+  function parseCSV(text){
+    text = text.replace(/^\uFEFF/, ''); // BOM entfernen
+    var lines = text.split(/\r\n|\n|\r/).filter(function(l){ return l.trim().length > 0; });
+    if(lines.length === 0) return {datasets: []};
+
+    // Trennzeichen erkennen (häufigstes von ; , Tab in den ersten Zeilen)
+    var candidates = [';', ',', '\t'];
+    var sample = lines.slice(0, 5);
+    var counts = {};
+    candidates.forEach(function(c){
+      counts[c] = sample.reduce(function(sum, l){ return sum + (l.split(c).length - 1); }, 0);
+    });
+    var delim = candidates.reduce(function(best, c){ return counts[c] > counts[best] ? c : best; }, ';');
+    if(counts[delim] === 0) delim = ';';
+
+    var rows = lines.map(function(l){ return l.split(delim).map(function(c){ return c.trim(); }); });
+
+    // Heuristik: "eine Zeile pro Datensatz" (Name + Zahlen) vs. "Tabelle mit Kopfzeile" (Spalten)
+    var rowFormatScore = 0;
+    rows.forEach(function(r){
+      if(r.length >= 2){
+        var firstIsNum = csvToNum(r[0]) !== null;
+        var restNumCount = r.slice(1).filter(function(c){ return csvToNum(c) !== null; }).length;
+        if(!firstIsNum && restNumCount >= Math.max(1, r.length - 2)) rowFormatScore++;
+      }
+    });
+
+    var datasets = [];
+    if(rowFormatScore >= Math.ceil(rows.length * 0.6)){
+      rows.forEach(function(r, i){
+        var label = r[0] || ('Datensatz ' + (i+1));
+        var values = r.slice(1).map(csvToNum).filter(function(n){ return n !== null; });
+        if(values.length) datasets.push({label: label, values: values});
+      });
+    } else {
+      var headerRow = rows[0];
+      var firstRowAllNonNum = headerRow.every(function(c){ return csvToNum(c) === null; });
+      var dataRows = firstRowAllNonNum ? rows.slice(1) : rows;
+      var numCols = rows.reduce(function(m, r){ return Math.max(m, r.length); }, 0);
+      for(var c = 0; c < numCols; c++){
+        var label = (firstRowAllNonNum && headerRow[c]) ? headerRow[c] : ('Datensatz ' + (c+1));
+        var values = [];
+        dataRows.forEach(function(r){
+          var n = csvToNum(r[c]);
+          if(n !== null) values.push(n);
+        });
+        if(values.length) datasets.push({label: label, values: values});
+      }
+    }
+    return {datasets: datasets, delimiter: delim};
+  }
+
+  var pendingImport = [];
+
+  function renderCsvPreview(){
+    var html = '';
+    pendingImport.forEach(function(p, i){
+      var previewVals = p.values.slice(0, 12).map(fmt).join('; ') + (p.values.length > 12 ? ' …' : '');
+      html += '<label class="csvRow">' +
+        '<input type="checkbox" data-csv-idx="' + i + '" ' + (p.include ? 'checked' : '') + '>' +
+        '<span class="csvRowText"><b>' + escXml(p.label) + '</b>' +
+        '<span class="csvMeta"> (n=' + p.values.length + ')</span>' +
+        '<div class="csvVals">' + escXml(previewVals) + '</div></span>' +
+        '</label>';
+    });
+    var elList = document.getElementById('csvPreviewList');
+    elList.innerHTML = html || '<i>Keine gültigen Datensätze in der Datei gefunden. Bitte Format prüfen.</i>';
+    Array.prototype.forEach.call(elList.querySelectorAll('input[type=checkbox]'), function(cb){
+      cb.addEventListener('change', function(){
+        pendingImport[parseInt(cb.getAttribute('data-csv-idx'), 10)].include = cb.checked;
+      });
+    });
+  }
+
+  function openCsvModal(datasets){
+    pendingImport = datasets.map(function(d){ return {label: d.label, values: d.values, include: true}; });
+    renderCsvPreview();
+    document.getElementById('csvModal').classList.add('open');
+  }
+  function closeCsvModal(){
+    document.getElementById('csvModal').classList.remove('open');
+    pendingImport = [];
+  }
+
+  function handleCsvFile(file){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var result = parseCSV(String(ev.target.result));
+      openCsvModal(result.datasets);
+    };
+    reader.onerror = function(){
+      openCsvModal([]);
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  // ---------- dataset model ----------
+  function createDataset(label, color, values){
+    return {
+      id: makeId(),
+      label: label,
+      color: color,
+      values: values || [],
+      showMean: false
+    };
+  }
+
+  function addDataset(){
+    var color = PALETTE[state.datasets.length % PALETTE.length];
+    var ds = createDataset('Datensatz ' + (state.datasets.length+1), color, []);
+    state.datasets.push(ds);
+    buildPanelDom(ds);
+    fullRender();
+  }
+
+  function removeDataset(id){
+    state.datasets = state.datasets.filter(function(d){ return d.id !== id; });
+    var node = document.getElementById('panel-' + id);
+    if(node) node.remove();
+    if(selectedPoint && selectedPoint.dsId === id) selectedPoint = null;
+    fullRender();
+  }
+
+  function importDatasets(parsed, mode){
+    if(mode === 'replace'){
+      state.datasets.forEach(function(d){
+        var node = document.getElementById('panel-' + d.id);
+        if(node) node.remove();
+      });
+      state.datasets = [];
+    }
+    parsed.forEach(function(p){
+      var color = PALETTE[state.datasets.length % PALETTE.length];
+      var ds = createDataset(p.label || ('Datensatz ' + (state.datasets.length+1)), color, p.values.slice());
+      state.datasets.push(ds);
+      buildPanelDom(ds);
+    });
+    selectedPoint = null;
+    fullRender();
+  }
+
+  // ---------- DOM building (persistent per dataset) ----------
+  function buildPanelDom(ds){
+    var panel = document.createElement('div');
+    panel.className = 'card dsPanel';
+    panel.id = 'panel-' + ds.id;
+
+    panel.innerHTML =
+      '<div class="dsHead">' +
+        '<span class="colorDot" data-role="colordot"></span>' +
+        '<input class="dsLabel" data-role="label" type="text" value="' + escXml(ds.label) + '">' +
+        '<input class="colorPicker no-print" data-role="colorpicker" type="color" value="' + ds.color + '">' +
+        '<label class="meanToggle no-print"><input type="checkbox" data-role="meanchk"> Mittelwert anzeigen</label>' +
+        '<div class="dsActions no-print">' +
+          '<button class="iconBtn" data-role="addpoint" title="Punkt hinzufügen">＋</button>' +
+          '<button class="iconBtn warn" data-role="remove" title="Datensatz löschen">🗑</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="valuesRow">' +
+        '<label>Werte:</label>' +
+        '<input class="valuesInput" data-role="values" type="text" inputmode="decimal" placeholder="z. B. 3,5; 7; 2,1; 9">' +
+      '</div>' +
+      '<div class="statsLine" data-role="stats"></div>' +
+      '<svg class="plotSvg" data-role="svg"></svg>';
+
+    elDatasets.appendChild(panel);
+
+    var elLabel = panel.querySelector('[data-role="label"]');
+    var elColorDot = panel.querySelector('[data-role="colordot"]');
+    var elColorPicker = panel.querySelector('[data-role="colorpicker"]');
+    var elMeanChk = panel.querySelector('[data-role="meanchk"]');
+    var elValues = panel.querySelector('[data-role="values"]');
+    var elStats = panel.querySelector('[data-role="stats"]');
+    var elSvg = panel.querySelector('[data-role="svg"]');
+    var elRemove = panel.querySelector('[data-role="remove"]');
+    var elAddPoint = panel.querySelector('[data-role="addpoint"]');
+
+    ds._el = {
+      panel: panel, label: elLabel, colorDot: elColorDot, colorPicker: elColorPicker,
+      meanChk: elMeanChk, values: elValues, stats: elStats, svg: elSvg, remove: elRemove
+    };
+
+    elLabel.addEventListener('input', function(){ ds.label = elLabel.value; });
+
+    elColorPicker.addEventListener('input', function(){
+      ds.color = elColorPicker.value;
+      updateDatasetPanel(ds);
+    });
+
+    elMeanChk.addEventListener('change', function(){
+      ds.showMean = elMeanChk.checked;
+      updateDatasetPanel(ds);
+    });
+
+    elValues.addEventListener('input', function(){
+      ds.values = parseInputToValues(elValues.value);
+      recomputeAxis();
+      renderAllPanels();
+    });
+
+    elAddPoint.addEventListener('click', function(){
+      var st = computeStats(ds.values);
+      var v = st ? st.mean : (currentAxis.min + currentAxis.max)/2;
+      ds.values.push(round2(v));
+      selectedPoint = {dsId: ds.id, idx: ds.values.length-1};
+      recomputeAxis();
+      renderAllPanels();
+    });
+
+    elRemove.addEventListener('click', function(){
+      if(pendingDeleteDsId === ds.id){
+        pendingDeleteDsId = null;
+        removeDataset(ds.id);
+      } else {
+        pendingDeleteDsId = ds.id;
+        elRemove.textContent = '⚠';
+        elRemove.title = 'Nochmal tippen zum Löschen';
+        setTimeout(function(){
+          if(pendingDeleteDsId === ds.id){
+            pendingDeleteDsId = null;
+            elRemove.textContent = '🗑';
+            elRemove.title = 'Datensatz löschen';
+          }
+        }, 3000);
+      }
+    });
+
+    attachSvgEvents(elSvg, ds);
+  }
+
+  function attachSvgEvents(svg, ds){
+    var dragIdx = null;
+
+    function onDown(e){
+      var target = e.target;
+      var role = target.getAttribute && target.getAttribute('data-role');
+      if(role === 'point'){
+        dragIdx = parseInt(target.getAttribute('data-idx'), 10);
+        selectedPoint = {dsId: ds.id, idx: dragIdx};
+        try{ svg.setPointerCapture(e.pointerId); }catch(err){}
+        renderAllPanels();
+        e.preventDefault();
+      } else if(role === 'delete-badge'){
+        var di = parseInt(target.getAttribute('data-idx'), 10);
+        ds.values.splice(di, 1);
+        selectedPoint = null;
+        recomputeAxis();
+        renderAllPanels();
+        e.preventDefault();
+      } else if(role === 'addzone'){
+        var relX = getRelX(e, svg);
+        var val = clamp(pxToValue(relX), currentAxis.min, currentAxis.max);
+        if(state.snap && state.snapStep > 0) val = Math.round(val/state.snapStep)*state.snapStep;
+        val = round2(val);
+        ds.values.push(val);
+        dragIdx = ds.values.length - 1;
+        selectedPoint = {dsId: ds.id, idx: dragIdx};
+        try{ svg.setPointerCapture(e.pointerId); }catch(err){}
+        recomputeAxis();
+        renderAllPanels();
+        e.preventDefault();
+      } else {
+        if(selectedPoint && selectedPoint.dsId === ds.id){
+          selectedPoint = null;
+          updateDatasetPanel(ds);
+        }
+      }
+    }
+
+    function onMove(e){
+      if(dragIdx === null) return;
+      var relX = getRelX(e, svg);
+      var val = clamp(pxToValue(relX), currentAxis.min, currentAxis.max);
+      if(state.snap && state.snapStep > 0) val = Math.round(val/state.snapStep)*state.snapStep;
+      ds.values[dragIdx] = round2(val);
+      if(state.autoAxis){
+        recomputeAxis();
+        renderAllPanels();
+      } else {
+        updateDatasetPanel(ds);
+      }
+      e.preventDefault();
+    }
+
+    function onUp(e){
+      if(dragIdx === null) return;
+      dragIdx = null;
+      try{ svg.releasePointerCapture(e.pointerId); }catch(err){}
+    }
+
+    svg.addEventListener('pointerdown', onDown);
+    svg.addEventListener('pointermove', onMove);
+    svg.addEventListener('pointerup', onUp);
+    svg.addEventListener('pointercancel', onUp);
+  }
+
+  // ---------- rendering ----------
+  function buildSvgMarkup(ds){
+    var values = ds.values;
+    var stacks = computeStacks(values);
+    var dotsAreaH = Math.max(1, stacks.maxRows) * ROW_H + 4;
+    var H = BOX_AREA_H + dotsAreaH + AXIS_H;
+    var dotsTop = BOX_AREA_H;
+    var axisLineY = BOX_AREA_H + dotsAreaH;
+    var row0Y = axisLineY - ROW_H/2 - 2;
+    var boxMidY = BOX_AREA_H / 2;
+
+    var parts = [];
+
+    // addzone (background for adding points)
+    parts.push('<rect data-role="addzone" x="0" y="' + dotsTop + '" width="' + VIEW_W + '" height="' + dotsAreaH +
+      '" fill="transparent"></rect>');
+
+    // axis
+    parts.push('<line x1="' + PAD_L + '" y1="' + axisLineY + '" x2="' + (VIEW_W-PAD_R) + '" y2="' + axisLineY +
+      '" stroke="#c7cedb" stroke-width="1.5"></line>');
+    currentAxis.ticks.forEach(function(t){
+      var x = xScale(t);
+      parts.push('<line x1="' + x + '" y1="' + axisLineY + '" x2="' + x + '" y2="' + (axisLineY+6) +
+        '" stroke="#c7cedb" stroke-width="1.5"></line>');
+      parts.push('<text x="' + x + '" y="' + (axisLineY+20) + '" font-size="13" fill="#8a93a3" text-anchor="middle">' +
+        escXml(fmt(t)) + '</text>');
+    });
+
+    var st = computeStats(values);
+    if(st){
+      var xMin = xScale(st.min), xMax = xScale(st.max);
+      var xQ1 = xScale(st.q1), xQ3 = xScale(st.q3), xMed = xScale(st.median);
+      var boxTop = boxMidY - 15, boxH = 30;
+
+      // whiskers
+      parts.push('<line x1="' + xMin + '" y1="' + boxMidY + '" x2="' + xQ1 + '" y2="' + boxMidY +
+        '" stroke="' + ds.color + '" stroke-width="2"></line>');
+      parts.push('<line x1="' + xQ3 + '" y1="' + boxMidY + '" x2="' + xMax + '" y2="' + boxMidY +
+        '" stroke="' + ds.color + '" stroke-width="2"></line>');
+      // whisker caps
+      parts.push('<line x1="' + xMin + '" y1="' + (boxMidY-9) + '" x2="' + xMin + '" y2="' + (boxMidY+9) +
+        '" stroke="' + ds.color + '" stroke-width="2"></line>');
+      parts.push('<line x1="' + xMax + '" y1="' + (boxMidY-9) + '" x2="' + xMax + '" y2="' + (boxMidY+9) +
+        '" stroke="' + ds.color + '" stroke-width="2"></line>');
+      // box
+      parts.push('<rect x="' + Math.min(xQ1,xQ3) + '" y="' + boxTop + '" width="' + Math.max(1,Math.abs(xQ3-xQ1)) +
+        '" height="' + boxH + '" fill="' + ds.color + '" fill-opacity="0.16" stroke="' + ds.color +
+        '" stroke-width="2"></rect>');
+      // median
+      parts.push('<line x1="' + xMed + '" y1="' + boxTop + '" x2="' + xMed + '" y2="' + (boxTop+boxH) +
+        '" stroke="' + ds.color + '" stroke-width="3"></line>');
+      // mean marker
+      if(ds.showMean){
+        var xMean = xScale(st.mean);
+        var s = 7;
+        parts.push('<polygon points="' +
+          xMean + ',' + (boxMidY-s) + ' ' +
+          (xMean+s) + ',' + boxMidY + ' ' +
+          xMean + ',' + (boxMidY+s) + ' ' +
+          (xMean-s) + ',' + boxMidY +
+          '" fill="#ffffff" stroke="' + ds.color + '" stroke-width="2.5"></polygon>');
+      }
+    }
+
+    // points
+    values.forEach(function(v, i){
+      var x = xScale(v);
+      var r = stacks.rowOf[i] || 0;
+      var y = row0Y - r * ROW_H;
+      var isSel = selectedPoint && selectedPoint.dsId === ds.id && selectedPoint.idx === i;
+      parts.push('<circle data-role="point" data-idx="' + i + '" cx="' + x + '" cy="' + y + '" r="' + RADIUS +
+        '" fill="' + ds.color + '" stroke="' + (isSel ? '#dc2626' : '#ffffff') +
+        '" stroke-width="' + (isSel ? 3 : 2) + '" style="cursor:grab;"></circle>');
+      if(isSel){
+        var bx = x, by = y - RADIUS - 14;
+        parts.push('<g>' +
+          '<circle data-role="delete-badge" data-idx="' + i + '" cx="' + bx + '" cy="' + by + '" r="10" fill="#ffffff" stroke="#dc2626" stroke-width="2" style="cursor:pointer;"></circle>' +
+          '<text data-role="delete-badge" data-idx="' + i + '" x="' + bx + '" y="' + (by+4) + '" font-size="12" fill="#dc2626" text-anchor="middle" style="cursor:pointer;">✕</text>' +
+          '</g>');
+      }
+    });
+
+    return {markup: parts.join(''), height: H};
+  }
+
+  function updateDatasetPanel(ds){
+    var el = ds._el;
+    if(!el) return;
+
+    if(document.activeElement !== el.label) el.label.value = ds.label;
+    if(document.activeElement !== el.colorPicker) el.colorPicker.value = ds.color;
+    el.colorDot.style.background = ds.color;
+    el.meanChk.checked = ds.showMean;
+
+    if(document.activeElement !== el.values){
+      el.values.value = valuesToInputText(ds.values);
+    }
+
+    var st = computeStats(ds.values);
+    if(!st){
+      el.stats.innerHTML = '<i>Noch keine Werte – Text eingeben oder in den Punktebereich tippen.</i>';
+    } else {
+      var html = 'n=<b>' + st.n + '</b> · Min <b>' + fmt(st.min) + '</b> · Q1 <b>' + fmt(st.q1) +
+        '</b> · Median <b>' + fmt(st.median) + '</b> · Q3 <b>' + fmt(st.q3) + '</b> · Max <b>' + fmt(st.max) + '</b>';
+      if(ds.showMean) html += ' · x̄ <b>' + fmt(st.mean) + '</b>';
+      el.stats.innerHTML = html;
+    }
+
+    var built = buildSvgMarkup(ds);
+    el.svg.setAttribute('viewBox', '0 0 ' + VIEW_W + ' ' + built.height);
+    el.svg.setAttribute('width', VIEW_W);
+    el.svg.setAttribute('height', built.height);
+    el.svg.innerHTML = built.markup;
+  }
+
+  function renderAllPanels(){
+    state.datasets.forEach(updateDatasetPanel);
+    elEmpty.style.display = state.datasets.length === 0 ? 'block' : 'none';
+
+    if(document.activeElement !== elAxisMin) elAxisMin.value = fmt(currentAxis.min);
+    if(document.activeElement !== elAxisMax) elAxisMax.value = fmt(currentAxis.max);
+  }
+
+  function fullRender(){
+    recomputeAxis();
+    renderAllPanels();
+  }
+
+  // ---------- global control events ----------
+  elAutoAxis.addEventListener('change', function(){
+    state.autoAxis = elAutoAxis.checked;
+    elAxisMin.disabled = state.autoAxis;
+    elAxisMax.disabled = state.autoAxis;
+    fullRender();
+  });
+  elAxisMin.addEventListener('input', function(){
+    var v = parseFloat(elAxisMin.value.replace(',', '.'));
+    if(isFinite(v)){ state.axisMin = v; fullRender(); }
+  });
+  elAxisMax.addEventListener('input', function(){
+    var v = parseFloat(elAxisMax.value.replace(',', '.'));
+    if(isFinite(v)){ state.axisMax = v; fullRender(); }
+  });
+  elSnap.addEventListener('change', function(){ state.snap = elSnap.checked; });
+  elSnapStep.addEventListener('input', function(){
+    var v = parseFloat(elSnapStep.value.replace(',', '.'));
+    if(isFinite(v) && v > 0) state.snapStep = v;
+  });
+
+  document.getElementById('addDatasetBtn').addEventListener('click', addDataset);
+
+  document.getElementById('exampleBtn').addEventListener('click', function(){
+    state.datasets.forEach(function(d){
+      var node = document.getElementById('panel-' + d.id);
+      if(node) node.remove();
+    });
+    state.datasets = [];
+    selectedPoint = null;
+    var a = createDataset('Klasse 10a', PALETTE[0], [12, 15, 14, 18, 21, 13, 16, 19, 22, 15]);
+    var b = createDataset('Klasse 10b', PALETTE[1], [9, 11, 14, 14, 15, 17, 20, 23, 25, 12, 16]);
+    state.datasets.push(a, b);
+    buildPanelDom(a); buildPanelDom(b);
+    a.showMean = true; b.showMean = true;
+    fullRender();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function(e){
+    var btn = e.currentTarget;
+    if(pendingResetConfirm){
+      pendingResetConfirm = false;
+      btn.textContent = 'Zurücksetzen';
+      state.datasets.forEach(function(d){
+        var node = document.getElementById('panel-' + d.id);
+        if(node) node.remove();
+      });
+      state.datasets = [];
+      selectedPoint = null;
+      var d0 = createDataset('Datensatz 1', PALETTE[0], []);
+      state.datasets.push(d0);
+      buildPanelDom(d0);
+      fullRender();
+    } else {
+      pendingResetConfirm = true;
+      btn.textContent = 'Sicher? Nochmal tippen';
+      setTimeout(function(){
+        pendingResetConfirm = false;
+        btn.textContent = 'Zurücksetzen';
+      }, 3000);
+    }
+  });
+
+  // ---------- CSV import events ----------
+  var elCsvFileInput = document.getElementById('csvFileInput');
+  document.getElementById('csvImportBtn').addEventListener('click', function(){
+    elCsvFileInput.click();
+  });
+  elCsvFileInput.addEventListener('change', function(e){
+    var file = e.target.files && e.target.files[0];
+    if(file) handleCsvFile(file);
+    elCsvFileInput.value = '';
+  });
+  document.getElementById('csvCancelBtn').addEventListener('click', closeCsvModal);
+  document.getElementById('csvModal').addEventListener('click', function(e){
+    if(e.target.id === 'csvModal') closeCsvModal();
+  });
+  document.getElementById('csvConfirmBtn').addEventListener('click', function(){
+    var modeEl = document.querySelector('input[name="csvMode"]:checked');
+    var mode = modeEl ? modeEl.value : 'append';
+    var toImport = pendingImport
+      .filter(function(p){ return p.include && p.values.length > 0; })
+      .map(function(p){ return {label: p.label, values: p.values}; });
+    closeCsvModal();
+    if(toImport.length > 0) importDatasets(toImport, mode);
+  });
+
+  // Drag & Drop einer CSV-Datei auf die Seite
+  ['dragover','drop'].forEach(function(evt){
+    window.addEventListener(evt, function(e){ e.preventDefault(); });
+  });
+  window.addEventListener('drop', function(e){
+    var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(file && /\.(csv|txt)$/i.test(file.name)) handleCsvFile(file);
+  });
+
+  // ---------- Druckfunktion ----------
+  document.getElementById('printBtn').addEventListener('click', function(){
+    window.print();
+  });
+  window.addEventListener('beforeprint', function(){
+    if(selectedPoint){ selectedPoint = null; renderAllPanels(); }
+    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  });
+
+  // ---------- init ----------
+  var first = createDataset('Datensatz 1', PALETTE[0], [4, 7, 7, 8, 9, 11, 13]);
+  state.datasets.push(first);
+  buildPanelDom(first);
+  fullRender();
+
+})();
+</script>
+</body>
+</html>
